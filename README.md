@@ -69,7 +69,7 @@ npm run develop
     - client_email(Email)
     - cart(Relation with Cart)
 
-Создайте Api Token админ-панели Strapi.
+Создайте Api Token в админ-панели Strapi.
 
 ### Подготовка телеграм
 
@@ -86,7 +86,7 @@ npm run develop
 Создайте в корне папки `strapi_bot` файл `.env`. Откройте его для редактирования любым текстовым редактором
 и запишите туда данные в таком формате: `ПЕРЕМЕННАЯ=значение`.
 Доступны следующие переменные:
- - TELEGRAM_TOKEN - ваш телеграм бот API ключ(бот, который отвечает на вопросы).
+ - TELEGRAM_TOKEN - ваш телеграм бот API ключ.
  - REDIS_DATABASE_HOST - ваш Redis адрес
  - REDIS_DATABASE_PORT - ваш Redis порт
  - REDIS_DATABASE_PASSWORD - ваш Redis пароль

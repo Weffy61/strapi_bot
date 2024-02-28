@@ -24,7 +24,7 @@ def waiting_email(update, context):
     context.bot.send_message(
         chat_id=query.message.chat_id,
         text='Введите ваш email:')
-    context.bot.deleteMessage(chat_id=query.message.chat_id, message_id=query.message.message_id)
+    context.bot.delete_message(chat_id=query.message.chat_id, message_id=query.message.message_id)
     return 'HANDLE_CART'
 
 
@@ -48,7 +48,7 @@ def handle_menu(update, context):
         reply_markup=get_main_menu_kb(context),
         text='Please choose:')
 
-    context.bot.deleteMessage(chat_id=query.message.chat_id, message_id=query.message.message_id)
+    context.bot.delete_message(chat_id=query.message.chat_id, message_id=query.message.message_id)
     return "HANDLE_DESCRIPTION"
 
 
@@ -102,7 +102,7 @@ def handle_cart(update, context):
         reply_markup=reply_markup,
         text=message)
 
-    context.bot.deleteMessage(chat_id=query.message.chat_id, message_id=query.message.message_id)
+    context.bot.delete_message(chat_id=query.message.chat_id, message_id=query.message.message_id)
 
     return 'HANDLE_MENU'
 
@@ -152,7 +152,7 @@ def handle_description(update, context):
        ''')
 
     context.bot.send_photo(chat_id=query.message.chat_id, photo=image, caption=message, reply_markup=reply_markup)
-    context.bot.deleteMessage(chat_id=query.message.chat_id, message_id=query.message.message_id)
+    context.bot.delete_message(chat_id=query.message.chat_id, message_id=query.message.message_id)
 
     return "HANDLE_MENU"
 

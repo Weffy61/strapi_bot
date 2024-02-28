@@ -1,66 +1,21 @@
-from io import BytesIO
 import logging
 import textwrap
-from urllib.parse import urljoin
 
 from environs import Env
 import redis
-import requests
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
+from strapi import get_cart, clear_cart, get_items, create_order, get_cart_items, get_item_image
 
 logger = logging.getLogger('Telegram logger')
 
 
 def start(update, context):
-    api_key = context.bot_data.get('strapi')
-    api_url = urljoin(url, 'api/products')
-    headers = {
-        'Authorization': f'bearer {api_key}'
-    }
-
-    payload = {
-        'populate': '*'
-    }
-
-    response = requests.get(api_url, headers=headers, params=payload)
-    response.raise_for_status()
-    products = response.json()
-    dispatcher.bot_data['products'] = products
-
+    # api_key = context.bot_data.get('strapi')
     update.message.reply_text('Please choose:', reply_markup=get_main_menu_kb(context))
     return "HANDLE_DESCRIPTION"
-
-
-def clear_cart(update, context):
-    query = update.callback_query
-    query.answer()
-    user_id = update.callback_query.message.chat_id
-    api_key = context.bot_data.get('strapi')
-
-    headers = {
-        'Authorization': f'bearer {api_key}',
-    }
-
-    payload = {
-        'user_telegram_id': user_id,
-        'populate[0]': 'cart_items'
-    }
-
-    response = requests.get(urljoin(url, 'api/carts'), headers=headers, params=payload)
-    response.raise_for_status()
-    cart = response.json()
-    if cart['data']:
-        cart_id = cart['data'][0]['id']
-        response_cart = requests.delete(urljoin(url, f'api/carts/{cart_id}'), headers=headers)
-        response_cart.raise_for_status()
-        cart_items = cart['data'][0]['attributes']['cart_items']['data']
-        for cart_item in cart_items:
-            cart_item_id = cart_item['id']
-            response_cart_id = requests.delete(urljoin(url, f'api/cart-items/{cart_item_id}'), headers=headers)
-            response_cart_id.raise_for_status()
 
 
 def waiting_email(update, context):
@@ -75,38 +30,18 @@ def waiting_email(update, context):
 
 def handle_menu(update, context):
     query = update.callback_query
+    url = context.bot_data.get('url')
     query.answer()
     if query.data == 'show_cart':
         return handle_cart(update, context)
     elif query.data == 'clear_cart':
-        clear_cart(update, context)
+        clear_cart(update, context, url)
     elif query.data == 'pay_order':
         return waiting_email(update, context)
     if query.data.startswith('add_item'):
         item_id = query.data.split('.')[-1]
         api_key = context.bot_data.get('strapi')
-        headers = {
-            'Authorization': f'bearer {api_key}',
-        }
-
-        cart_response = requests.get(urljoin(url, 'api/carts'), headers=headers)
-
-        cart_response.raise_for_status()
-        cart = cart_response.json()
-        if cart['data']:
-            cart_id = cart['data'][0].get('id')
-            add_item_to_cart(item_id, cart_id, api_key)
-
-        else:
-            payload = {
-                'data': {
-                    'user_telegram_id': query.message.chat.id
-                }
-            }
-            response = requests.post(urljoin(url, 'api/carts'), headers=headers, json=payload)
-            response.raise_for_status()
-            cart_id = response.json()['data']['id']
-            add_item_to_cart(item_id, cart_id, api_key)
+        get_cart(api_key, query, item_id, url)
 
     context.bot.send_message(
         chat_id=query.message.chat_id,
@@ -119,24 +54,15 @@ def handle_menu(update, context):
 
 def handle_cart(update, context):
     api_key = context.bot_data.get('strapi')
+    url = context.bot_data.get('url')
+
     headers = {
         'Authorization': f'bearer {api_key}',
     }
-
     if update.message:
-        cart_response = requests.get(urljoin(url, 'api/carts'),
-                                     headers=headers,
-                                     params={'user_telegram_id': update.message.chat_id})
-        cart_response.raise_for_status()
-        cart = cart_response.json()['data'][0]['id']
-        payload = {
-            'data': {
-                'client_email': update.message.text,
-                'cart': cart
-            }
-        }
-        order_response = requests.post(urljoin(url, 'api/orders'), headers=headers, json=payload)
-        order_response.raise_for_status()
+        client_email = update.message.text
+        user_telegram_id = update.message.chat_id
+        create_order(user_telegram_id, client_email, headers, url)
         context.bot.send_message(
             chat_id=update.message.chat_id,
             text='Вас заказ успешно оформлен')
@@ -146,15 +72,8 @@ def handle_cart(update, context):
     query.answer()
 
     user_id = update.callback_query.message.chat_id
+    cart = get_cart_items(user_id, headers, url)
 
-    payload = {
-        'user_telegram_id': user_id,
-        'populate[0]': 'cart_items.product'
-    }
-
-    response = requests.get(urljoin(url, 'api/carts'), headers=headers, params=payload)
-    response.raise_for_status()
-    cart = response.json()
     total_price = 0
     message = ''
     keyboard = [
@@ -203,52 +122,6 @@ def get_main_menu_kb(context):
     return reply_markup
 
 
-def get_item(item_id, cart_id, api_key):
-
-    headers = {
-        'Authorization': f'bearer {api_key}',
-    }
-
-    payload = {
-        'populate[0]': 'cart_items.product'
-    }
-
-    response = requests.get(urljoin(url, f'api/carts/{cart_id}'), headers=headers, params=payload)
-    response.raise_for_status()
-    cart_items = response.json()['data']['attributes']['cart_items']['data']
-    for item in cart_items:
-        if item['attributes']['product']['data']['id'] == int(item_id):
-            return {'item_id': item['id'], 'item_weight': item['attributes']['weight']}
-    return
-
-
-def add_item_to_cart(item_id, cart_id, api_key):
-    item = get_item(item_id, cart_id, api_key)
-    headers = {
-        'Authorization': f'bearer {api_key}',
-    }
-    if item:
-        payload = {
-            'data': {
-                'weight': item['item_weight'] + 1
-            }
-        }
-        response = requests.put(urljoin(url, f'api/cart-items/{item["item_id"]}'),
-                                headers=headers,
-                                json=payload)
-        response.raise_for_status()
-    else:
-        payload = {
-            'data': {
-                'product': item_id,
-                'cart': cart_id,
-                'weight': 1
-            }
-        }
-        response = requests.post(urljoin(url, 'api/cart-items/'), headers=headers, json=payload)
-        response.raise_for_status()
-
-
 def handle_description(update, context):
     query = update.callback_query
     query.answer()
@@ -261,13 +134,9 @@ def handle_description(update, context):
     products = context.bot_data.get('products')
     product = products.get('data')[int(query.data) - 1]
     product_details = product.get('attributes')
+    url = context.bot_data.get('url')
 
-    image_url = urljoin(
-        url,
-        product_details.get('picture')['data']['attributes']['formats']['small']['url']
-    )
-    response = requests.get(image_url)
-    image = BytesIO(response.content)
+    image = get_item_image(product_details, url)
     keyboard = [
         [InlineKeyboardButton('Добавить в корзину', callback_data=f'add_item.{product["id"]}')],
         [InlineKeyboardButton('Корзина', callback_data='show_cart')],
@@ -323,7 +192,7 @@ def handle_users_reply(update, context):
     db.set(chat_id, next_state)
 
 
-if __name__ == '__main__':
+def main():
     try:
         env = Env()
         env.read_env()
@@ -341,7 +210,9 @@ if __name__ == '__main__':
 
         updater = Updater(token)
         dispatcher = updater.dispatcher
-
+        products = get_items(strapi_api_key, url)
+        dispatcher.bot_data['products'] = products
+        dispatcher.bot_data['url'] = url
         logging.basicConfig(
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
         )
@@ -358,3 +229,7 @@ if __name__ == '__main__':
         updater.start_polling()
     except Exception as e:
         handle_error(e)
+
+
+if __name__ == '__main__':
+    main()

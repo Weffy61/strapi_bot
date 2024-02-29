@@ -160,10 +160,6 @@ def handle_error(exception):
     logger.exception(f'Бот завершил работу с ошибкой: {exception}', exc_info=True)
 
 
-def error_handler(update, context):
-    handle_error(context.error)
-
-
 def handle_users_reply(update, context):
     db = context.bot_data.get('redis')
     if update.message:
@@ -221,7 +217,7 @@ def main():
         dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
         dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
         dispatcher.add_handler(CommandHandler('start', handle_users_reply))
-        dispatcher.add_error_handler(error_handler)
+        dispatcher.add_error_handler(handle_error)
 
         dispatcher.bot_data['redis'] = redis_db
         dispatcher.bot_data['strapi'] = strapi_api_key

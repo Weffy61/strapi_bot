@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 import requests
 
 
-def get_cart(api_key, query, item_id, url):
+def get_cart(api_key, query, url):
     headers = {
         'Authorization': f'bearer {api_key}',
     }
@@ -15,7 +15,6 @@ def get_cart(api_key, query, item_id, url):
     cart = cart_response.json()
     if cart['data']:
         cart_id = cart['data'][0].get('id')
-        add_item_to_cart(item_id, cart_id, api_key, url)
 
     else:
         payload = {
@@ -25,8 +24,36 @@ def get_cart(api_key, query, item_id, url):
         }
         response = requests.post(urljoin(url, 'api/carts'), headers=headers, json=payload)
         response.raise_for_status()
-        cart_id = response.json()['data']['id']
-        add_item_to_cart(item_id, cart_id, api_key, url)
+        cart_id = response.json()['data']['id']F
+    return cart_id
+
+
+def add_item_to_cart(item_id, api_key, url, query):
+    cart_id = get_cart(api_key, query, url)
+    item = get_item(item_id, cart_id, api_key, url)
+    headers = {
+        'Authorization': f'bearer {api_key}',
+    }
+    if item:
+        payload = {
+            'data': {
+                'weight': item['item_weight'] + 1
+            }
+        }
+        response = requests.put(urljoin(url, f'api/cart-items/{item["item_id"]}'),
+                                headers=headers,
+                                json=payload)
+        response.raise_for_status()
+    else:
+        payload = {
+            'data': {
+                'product': item_id,
+                'cart': cart_id,
+                'weight': 1
+            }
+        }
+        response = requests.post(urljoin(url, 'api/cart-items/'), headers=headers, json=payload)
+        response.raise_for_status()
 
 
 def clear_cart(update, context, url):
@@ -57,32 +84,6 @@ def clear_cart(update, context, url):
             response_cart_id = requests.delete(urljoin(url, f'api/cart-items/{cart_item_id}'), headers=headers)
             response_cart_id.raise_for_status()
 
-
-def add_item_to_cart(item_id, cart_id, api_key, url):
-    item = get_item(item_id, cart_id, api_key, url)
-    headers = {
-        'Authorization': f'bearer {api_key}',
-    }
-    if item:
-        payload = {
-            'data': {
-                'weight': item['item_weight'] + 1
-            }
-        }
-        response = requests.put(urljoin(url, f'api/cart-items/{item["item_id"]}'),
-                                headers=headers,
-                                json=payload)
-        response.raise_for_status()
-    else:
-        payload = {
-            'data': {
-                'product': item_id,
-                'cart': cart_id,
-                'weight': 1
-            }
-        }
-        response = requests.post(urljoin(url, 'api/cart-items/'), headers=headers, json=payload)
-        response.raise_for_status()
 
 
 def get_item(item_id, cart_id, api_key, url):

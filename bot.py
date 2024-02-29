@@ -1,4 +1,5 @@
 import logging
+import sys
 import textwrap
 
 from environs import Env
@@ -107,7 +108,9 @@ def handle_cart(update, context):
 
 
 def get_main_menu_kb(context):
-    products = context.bot_data.get('products')
+    api_key = context.bot_data.get('strapi')
+    url = context.bot_data.get('url')
+    products = get_items(api_key, url)
     keyboard = [
         [InlineKeyboardButton(
             product.get('attributes')['title'],
@@ -130,10 +133,11 @@ def handle_description(update, context):
     elif query.data == 'pay_order':
         return 'WAITING_EMAIL'
 
-    products = context.bot_data.get('products')
+    url = context.bot_data.get('url')
+    api_key = context.bot_data.get('strapi')
+    products = get_items(api_key, url)
     product = products.get('data')[int(query.data) - 1]
     product_details = product.get('attributes')
-    url = context.bot_data.get('url')
 
     image = get_item_image(product_details, url)
     keyboard = [
@@ -156,7 +160,8 @@ def handle_description(update, context):
     return "HANDLE_MENU"
 
 
-def handle_error(exception):
+def handle_error(update, context):
+    exception = context.error
     logger.exception(f'Бот завершил работу с ошибкой: {exception}', exc_info=True)
 
 
@@ -205,8 +210,6 @@ def main():
 
         updater = Updater(token)
         dispatcher = updater.dispatcher
-        products = get_items(strapi_api_key, url)
-        dispatcher.bot_data['products'] = products
         dispatcher.bot_data['url'] = url
         logging.basicConfig(
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
@@ -222,8 +225,8 @@ def main():
         dispatcher.bot_data['redis'] = redis_db
         dispatcher.bot_data['strapi'] = strapi_api_key
         updater.start_polling()
-    except Exception as e:
-        handle_error(e)
+    except Exception:
+        handle_error(*sys.exc_info())
 
 
 if __name__ == '__main__':

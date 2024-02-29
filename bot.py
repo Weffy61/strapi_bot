@@ -8,7 +8,7 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
-from strapi import get_cart, clear_cart, get_items, create_order, get_cart_items, get_item_image
+from strapi import clear_cart, get_items, create_order, get_cart_items, get_item_image, add_item_to_cart
 
 logger = logging.getLogger('Telegram logger')
 
@@ -41,7 +41,7 @@ def handle_menu(update, context):
     if query.data.startswith('add_item'):
         item_id = query.data.split('.')[-1]
         api_key = context.bot_data.get('strapi')
-        get_cart(api_key, query, item_id, url)
+        add_item_to_cart(item_id, api_key, url, query)
 
     context.bot.send_message(
         chat_id=query.message.chat_id,

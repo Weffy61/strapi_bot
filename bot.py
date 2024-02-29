@@ -13,7 +13,6 @@ logger = logging.getLogger('Telegram logger')
 
 
 def start(update, context):
-    # api_key = context.bot_data.get('strapi')
     update.message.reply_text('Please choose:', reply_markup=get_main_menu_kb(context))
     return "HANDLE_DESCRIPTION"
 
